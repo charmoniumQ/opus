@@ -63,7 +63,7 @@ bool AggrMsg::add_msg(const FuncInfoMessage& buf_func_info_msg)
 {
     bool ret = true;
 
-    const uint32_t msg_size = buf_func_info_msg.ByteSize();
+    const uint32_t msg_size = buf_func_info_msg.ByteSizeLong();
     char *msg_buf = NULL;
 
     try
@@ -99,7 +99,7 @@ bool AggrMsg::flush()
     if (cur_msg_size == 0) return true;
 
     Header hdr_msg;
-    set_header_data(&hdr_msg, aggr_msg->ByteSize(), PayloadType::AGGREGATION_MSG);
+    set_header_data(&hdr_msg, aggr_msg->ByteSizeLong(), PayloadType::AGGREGATION_MSG);
 
     if (!ProcUtils::serialise_and_send_data(hdr_msg, *aggr_msg))
     {

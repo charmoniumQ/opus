@@ -1,5 +1,5 @@
 all: messages.yaml gen_msg.py c.tmpl py.tmpl
-	./gen_msg.py messages.yaml
+	$(PYTHON) ./gen_msg.py messages.yaml
 	cp messaging.h $(PROJ_INCLUDE)
 	cp messaging.py $(PROJ_HOME)/src/backend/opus
 

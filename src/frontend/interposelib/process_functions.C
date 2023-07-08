@@ -1036,7 +1036,7 @@ extern "C" void pthread_exit(void *retval)
                         ProcUtils::get_proto_msg(PayloadType::FUNCINFO_MSG));
 
     // Keep interposition turned off
-    if (!func_msg)
+    if (func_msg)
     {
         uint64_t start_time = SysUtil::get_time();
         uint64_t end_time = 0;

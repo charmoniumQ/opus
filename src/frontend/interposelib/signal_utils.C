@@ -358,7 +358,7 @@ bool SignalUtils::init_signal_capture()
             SIGHUP, SIGALRM, SIGVTALRM, SIGPROF, SIGIO,
             SIGPOLL, SIGTSTP, SIGTTIN, SIGTTOU, SIGPIPE,
             SIGXCPU, SIGXFSZ, SIGUSR1, SIGUSR2, SIGPWR,
-            SIGSTKFLT, SIGILL, SIGSYS, SIGUNUSED };
+            SIGSTKFLT, SIGILL, SIGSYS };
 
         std::vector<int> signals_vec(signal_list,
                 signal_list + sizeof(signal_list) / sizeof(int));

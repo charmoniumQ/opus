@@ -35,7 +35,7 @@ namespace
                                     const PayloadType pay_type)
     {
         struct Header hdr_msg;
-        set_header_data(&hdr_msg, pay_msg.ByteSize(), pay_type);
+        set_header_data(&hdr_msg, pay_msg.ByteSizeLong(), pay_type);
 
         return ProcUtils::serialise_and_send_data(hdr_msg, pay_msg);
     }

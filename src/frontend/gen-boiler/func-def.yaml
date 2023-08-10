@@ -471,36 +471,47 @@
     name: count
     type: "size_t"
 
+# With this block uncommented, I get this error with any non-ancient GLibC
+# 
+#     /tmp/nix-shell.EyMgJ3/ccqJTJi2.s:77538: Error: symbol `__isoc99_vscanf' is already defined
+# 
+# Some person says,
+# 
+# > Newer libc implementations were defining two of the fscanf family of 
+# > functions we intercept (fscanf & __isoc99_fscanf) as aliases using 
+# > assembler tricks, which was leading to the multiple definitions error. 
+# 
+# https://lists.mcs.anl.gov/mailman/htdig/darshan-users/2020-February/000574.html
 
-- name: __isoc99_vscanf
-  ret: "int"
-  flags: [buffer]
-  args:
-  - flags: {}
-    name: format
-    type: "const char *"
+# - name: __isoc99_vscanf
+#   ret: "int"
+#   flags: [buffer]
+#   args:
+#   - flags: {}
+#     name: format
+#     type: "const char *"
 
-  - flags: {}
-    name: ap
-    type: "va_list"
+#   - flags: {}
+#     name: ap
+#     type: "va_list"
 
 
-- name: __isoc99_vfscanf
-  ret: "int"
-  flags: [buffer]
-  args:
-  - flags:
-      read: ""
-    name: stream
-    type: "FILE *"
+# - name: __isoc99_vfscanf
+#   ret: "int"
+#   flags: [buffer]
+#   args:
+#   - flags:
+#       read: ""
+#     name: stream
+#     type: "FILE *"
 
-  - flags: {}
-    name: format
-    type: "const char *"
+#   - flags: {}
+#     name: format
+#     type: "const char *"
 
-  - flags: {}
-    name: ap
-    type: "va_list"
+#   - flags: {}
+#     name: ap
+#     type: "va_list"
 
 
 - name: getc_unlocked
@@ -1561,28 +1572,28 @@
     name: "format"
     type: "const char *"
 
-- name: __isoc99_scanf
-  ret: "int"
-  real_func: "__isoc99_vscanf"
-  flags: [vararg, nofnptr, buffer]
-  args: 
-  - flags: {}
-    name: "format"
-    type: "const char *"
+# - name: __isoc99_scanf
+#   ret: "int"
+#   real_func: "__isoc99_vscanf"
+#   flags: [vararg, nofnptr, buffer]
+#   args: 
+#   - flags: {}
+#     name: "format"
+#     type: "const char *"
 
-- name: __isoc99_fscanf
-  ret: "int"
-  real_func: "__isoc99_vfscanf"
-  flags: [vararg, nofnptr, buffer]
-  args: 
-  - flags:
-      read: ""
-    name: stream
-    type: "FILE *"
+# - name: __isoc99_fscanf
+#   ret: "int"
+#   real_func: "__isoc99_vfscanf"
+#   flags: [vararg, nofnptr, buffer]
+#   args: 
+#   - flags:
+#       read: ""
+#     name: stream
+#     type: "FILE *"
 
-  - flags: {}
-    name: "format"
-    type: "const char *"
+#   - flags: {}
+#     name: "format"
+#     type: "const char *"
 
 
 - name: socket

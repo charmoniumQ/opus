@@ -15,7 +15,6 @@ from .exception import BackendConnectionError
 
 CC_HDR = struct.Struct(str("@I"))
 
-
 def send_cc_msg(sock, msg):
     '''Sends a command control message over the socket sock.'''
     msg_txt = json.dumps(msg)
@@ -24,11 +23,12 @@ def send_cc_msg(sock, msg):
     sock.send(buf)
 
 
-def __recv(sock, data_len):
+def __recv(sock, data_len, timeout):
     '''Recieves data of length data_len from socket sock.
     If the read from the socket fails at any point a IOError is thrown.'''
     buf = []
     size = data_len
+    sock.settimeout(timeout)
     while size > 0:
         tmp = sock.recv(data_len)
         if tmp == str(""):
@@ -38,11 +38,11 @@ def __recv(sock, data_len):
     return str("").join(buf)
 
 
-def recv_cc_msg(sock):
+def recv_cc_msg(sock, timeout):
     '''Receives a single command control message from the given socket sock.'''
-    hdr_buf = __recv(sock, CC_HDR.size)
+    hdr_buf = __recv(sock, CC_HDR.size, timeout)
     pay_len = CC_HDR.unpack(hdr_buf)[0]
-    pay_buf = __recv(sock, pay_len)
+    pay_buf = __recv(sock, pay_len, timeout)
     pay = json.loads(pay_buf)
     return pay
 
@@ -68,9 +68,11 @@ class CommandConnectionHelper(object):
             raise BackendConnectionError("Failed to send message to backend:"
                                          " %s" % exc)
         try:
-            ret = recv_cc_msg(conn)
+            ret = recv_cc_msg(conn, 2.0)
         except IOError as exc:
             raise BackendConnectionError("Failed to receive message from"
                                          " backend: %s" % exc)
+        except TimeoutError:
+            raise BackendConnectionError("Recv timed out")
         conn.close()
         return ret

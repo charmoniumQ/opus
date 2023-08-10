@@ -40,8 +40,8 @@ def monitor_server_startup(cfg):
         server_active = utils.is_server_active(helper=helper)
         time.sleep(0.1)
     print("\nServer startup failed, check the %s and %s error logs for "
-          "information." % (os.path.join(cfg['install_dir'], "opus_err.log"),
-                            os.path.join(cfg['install_dir'], "opus.log")))
+          "information." % (os.path.join(cfg['data_dir'], "opus_err.log"),
+                            os.path.join(cfg['data_dir'], "opus.log")))
     return False
 
 
@@ -59,7 +59,7 @@ def start_opus_server(cfg):
     except OSError:
         sys.exit(1)
 
-    os.chdir(utils.path_normalise(cfg['install_dir']))
+    os.chdir(utils.path_normalise(cfg['data_dir']))
     os.setsid()
     os.umask(0)
 
@@ -70,25 +70,27 @@ def start_opus_server(cfg):
     except OSError:
         sys.exit(1)
 
-    err_log = utils.path_normalise(os.path.join(cfg['install_dir'],
+    err_log = utils.path_normalise(os.path.join(cfg['data_dir'],
                                                 "opus_err.log"))
     sys.stdout.flush()
     sys.stderr.flush()
-    sti = file("/dev/null", 'r')
+    sti = open("/dev/null", 'r')
     sto = open(err_log, 'w+')
     os.dup2(sti.fileno(), sys.stdin.fileno())
     os.dup2(sto.fileno(), sys.stdout.fileno())
     os.dup2(sto.fileno(), sys.stderr.fileno())
     sto.close()
 
-    server_cfg_path = utils.path_normalise(os.path.join(cfg['install_dir'],
+    server_cfg_path = utils.path_normalise(os.path.join(cfg['data_dir'],
                                                         "opus-cfg.yaml"))
 
     try:
         os.environ['PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION'] = 'cpp'
         os.environ['PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION_VERSION'] = '2'
-        os.execvp(cfg['python_binary'],
-                  [cfg['python_binary'],
+        python_root = (os.path.dirname(os.path.dirname(sys.executable)))
+        os.environ["PYTHONPATH"] = ":".join(filter(lambda path: path and not path.startswith(python_root), sys.path))
+        os.execvp(sys.executable,
+                  [sys.executable,
                    "-O",
                    "-m",
                    "opus.run_server",

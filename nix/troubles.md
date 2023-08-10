@@ -1,0 +1,9 @@
+- OPUS depends on an old GLibC behavior where it would define two functions separately, which OPUS would (re)define in its own code. In modern GLibC, these functions are aliases, so OPUS's code, when linked against modern GLibC, would define that fnuction twice, which would cause an error. Fixed by removing the second function definition, and trusting that defining one is enough to define the other (i.e., that it is an alias).
+- OPUS depend on Python 2.
+  - Could acquire Python 2 via old Nixpkgs commit, but some problems I don't remember with that.
+  - Updated code with `2to3` (not too bad). I tried to make updates without breaking Python 2 in an obvious way, but I don't care about Python 2 and don't have a way of testing it. Mostly the pair (unicode, str) in Python 2 got renamed to (str, bytes); that is unicode -> str and str -> bytes, simultaneously.
+- neo4j-embedded does not exist in PyPI anymore.
+  - Found the source code here: https://github.com/neo4j-contrib/python-embedded
+  - This package is built with Maven; Maven doesn't know how to install Python or Python packages, so I'd prefer to not build with Maven. Instead, I've been trying to build natively (do the commands that Maven _would_ do).
+  - This package depends on Neo4J 1.9, which does not exist in Nix, so I am trying to use a newer version. 4.x appears to not have the right classes, but 3.x appears to work.
+  - This package does not work with the latest version of JPype1. There is no pinned version, so I have to guess on this too. 0.7.1 does not work. 

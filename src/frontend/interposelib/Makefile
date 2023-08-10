@@ -22,7 +22,7 @@ CFLAGS2 := $(CFLAGS2) -DCOMPUTE_GIT_HASH
 CFLAGS2 := $(CFLAGS2) -std=gnu++0x
 CFLAGS2 := $(CFLAGS2) -I$(PROJ_INCLUDE)
 
-LFLAGS  := $(LFLAGS) -Wl,-Bstatic -lprotobuf -lcrypto -Wl,-Bdynamic -lpthread -lrt -ldl 
+LFLAGS  := $(LFLAGS) -Wl,-Bstatic -Wl,-Bdynamic -lpthread -lrt -ldl 
 
 SRCS    :=  log.C \
             opus_lock.C \

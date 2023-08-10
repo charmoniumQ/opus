@@ -48,9 +48,7 @@ def reset_opus_env(cfg):
         if var in os.environ:
             del os.environ[var]
 
-    opus_preload_lib = path_normalise(os.path.join(cfg['install_dir'],
-                                                   'lib',
-                                                   'libopusinterpose.so'))
+    opus_preload_lib = path_normalise(cfg['install_dir'])
     if 'LD_PRELOAD' in os.environ:
         if os.environ['LD_PRELOAD'] == opus_preload_lib:
             del os.environ['LD_PRELOAD']

@@ -16,6 +16,8 @@ import types
 import psutil
 import time
 import commands
+import sys
+import re
 
 from . import config_util, ipc
 from .exception import SnapshotException
@@ -173,8 +175,12 @@ class AnalyserController(object):
         if status != 0:
             logging.error("%d: %s", status, output)
         else:
+            print(output, file=sys.stderr)
             lines = output.split('\n')
-            fields = lines[1].split()
+            # on my machine, there is a "Picked up _JAVA_OPTIONS=..." line
+            # So the line with numbers is not necessarily the second line.
+            fields = re.search("^(\\s*)([\\d.]+)\\s+([\\d.]+)\\s+([\\d.]+)\\s+([\\d.]+)\\s+([\\d.]+)\\s+([\\d.]+)\\s+([\\d.]+)\\s+([\\d.]+)\\s+([\\d.]+)", line).groups()
+            print(list(fields), file=sys.stderr)
             jstat_max_jvm = float(fields[1]) + float(fields[7])
             heap_size = float(fields[3]) + float(fields[4])
             heap_size += float(fields[5]) + float(fields[9])

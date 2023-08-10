@@ -60,7 +60,8 @@ class CommandControl(object):
         except IOError:
             logging.error("Failed to bind cmd socket on address %s.",
                           listen_addr)
-            raise CommandInterfaceStartupError("Failed to bind socket.")
+            raise CommandInterfaceStartupError("Failed to bind socket %s."
+                                               % listen_addr)
         self.host_sock.listen(10)
 
     def exec_cmd(self, msg):
@@ -107,7 +108,7 @@ class CommandControl(object):
                              " to not matching white list.", new_addr)
                 continue
 
-            pay = cc_utils.recv_cc_msg(new_conn)
+            pay = cc_utils.recv_cc_msg(new_conn, 5)
             rsp = self.exec_cmd(pay)
             cc_utils.send_cc_msg(new_conn, rsp)
 

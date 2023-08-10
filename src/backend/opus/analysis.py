@@ -14,7 +14,7 @@ import logging
 import threading
 import time
 
-from . import common_utils, exception, storage, opuspb, order, messaging
+from . import common_utils, exception, storage, order, messaging
 from . import uds_msg_pb2 as uds_msg
 from .pvm import posix
 

@@ -18,7 +18,7 @@ import struct
 import threading
 import time
 
-from . import common_utils, ipc, messaging, multisocket, opuspb, uds_msg_pb2
+from . import common_utils, ipc, messaging, multisocket, uds_msg_pb2
 from .exception import OPUSException
 
 

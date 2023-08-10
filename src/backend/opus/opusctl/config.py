@@ -4,11 +4,15 @@ from __future__ import absolute_import, division, print_function
 import os
 import functools
 import hashlib
+import sys
 
 from . import utils
 from .ext_deps import yaml
 
-DEFAULT_CONFIG_PATH = "~/.opus-cfg"
+XDG_CONFIG_HOME = os.environ.get("XDG_CONFIG_HOME", "~/.config")
+XDG_DATA_HOME = os.environ.get("XDG_DATA_HOME", "~/.local/share")
+
+DEFAULT_CONFIG_PATH = os.path.join(XDG_CONFIG_HOME, "opus", "opus.conf")
 
 if 'OPUS_MASTER_CONFIG' in os.environ:
     CONFIG_PATH = utils.path_normalise(os.environ['OPUS_MASTER_CONFIG'])
@@ -20,29 +24,32 @@ CONFIG_SETUP = [
      'def': lambda _: DEFAULT_CONFIG_PATH,
      'prompt': 'Choose a location for the OPUS master config'},
 
-    {'key': 'install_dir',
-     'def': lambda _: os.getcwd(),
-     'prompt': 'Where is your OPUS installation?'},
+    {'key': 'libopus_path',
+     'def': lambda _: os.environ.get(
+         "LIBOPUS_PATH",
+         os.path.join(os.getcwd(), "lib", "libopusinterpose.so"),
+     ),
+     'prompt': 'Where is your OPUS .so?'},
+
+    {'key': 'data_dir',
+     'def': lambda _: os.path.join(XDG_DATA_HOME, "opus"),
+     'prompt': 'Where do you want to store OPUS data?'},
 
     {'key': 'server_addr',
-     'def': lambda cfg: "unix://" + os.path.join(cfg['install_dir'],
+     'def': lambda cfg: "unix://" + os.path.join(cfg['data_dir'],
                                                  'uds_sock'),
      'prompt': 'Choose an address for provenance data collection.'},
 
     {'key': 'db_path',
-     'def': lambda cfg: os.path.join(cfg['install_dir'], 'prov.neo4j'),
+     'def': lambda cfg: os.path.join(cfg['data_dir'], 'prov.neo4j'),
      'prompt': 'Choose a location for the OPUS database to reside in'},
 
     {'key': 'bash_var_path',
-     'def': lambda cfg: os.path.join(cfg['install_dir'], '.opus-vars'),
+     'def': lambda cfg: os.path.join(cfg['data_dir'], '.opus-vars'),
      'prompt': 'Choose a location for the OPUS bash variables cfg_file'},
 
-    {'key': 'python_binary',
-     'def': lambda _: '/usr/bin/python2.7',
-     'prompt': 'What is the location of your python 2.7 binary?'},
-
     {'key': 'java_home',
-     'def': lambda _: '/usr/lib/jvm/java-7-common',
+     'def': lambda _: os.environ.get("JAVA_HOME", '/usr/lib/jvm/java-7-common'),
      'prompt': 'Where is your jvm installation?'},
 
     {'key': 'cc_addr',
@@ -155,7 +162,6 @@ def skip_config(func):
         return func(*args, **kwargs)
     return wrap
 
-
 def compute_config_check(cfg):
     sha1 = hashlib.sha1()
 
@@ -169,7 +175,7 @@ def read_config(config_path):
         try:
             with open(config_path, "r") as cfg_file:
                 check = cfg_file.readline().rstrip()
-                return (check, yaml.load(cfg_file.read()))
+                return (check, yaml.safe_load(cfg_file.read()))
         except [yaml.error.YAMLError, IOError]:
             raise FailedConfigError()
     else:
@@ -179,6 +185,8 @@ def read_config(config_path):
 def write_config(config_path, cfg):
     config_path = utils.path_normalise(config_path)
     cfg_str, cfg_check = compute_config_check(cfg)
+    if not os.path.exists(os.path.dirname(config_path)):
+        os.makedirs(os.path.dirname(config_path))
     with open(config_path, "w") as cfg_file:
         cfg_file.write(cfg_check)
         cfg_file.write("\n")
@@ -233,12 +241,14 @@ def generate_config(existing=None):
 
 def generate_bash_var_file(cfg):
     var_file_path = utils.path_normalise(cfg['bash_var_path'])
+    if not os.path.exists(os.path.dirname(var_file_path)):
+        os.makedirs(os.path.dirname(var_file_path))
 
     with open(var_file_path, "w") as var_file:
         var_file.write(
             BASH_VAR_TEMPLATE.format(
                 bin_dir=utils.path_normalise(
-                    os.path.join(cfg['install_dir'], "bin")
+                    os.path.join(cfg['data_dir'], "bin")
                 ),
                 conf_loc=utils.path_normalise(
                     cfg['master_config']
@@ -248,19 +258,21 @@ def generate_bash_var_file(cfg):
 
 
 def generate_server_cfg_file(cfg):
-    server_cfg_path = utils.path_normalise(os.path.join(cfg['install_dir'],
+    server_cfg_path = utils.path_normalise(os.path.join(cfg['data_dir'],
                                                         "opus-cfg.yaml"))
 
     log_level = "DEBUG" if cfg['debug_mode'] else "ERROR"
-    log_file = utils.path_normalise(os.path.join(cfg['install_dir'],
+    log_file = utils.path_normalise(os.path.join(cfg['data_dir'],
                                                  "opus.log"))
     server_addr = cfg['server_addr']
     db_path = utils.path_normalise(cfg['db_path'])
-    touch_file = utils.path_normalise(os.path.join(cfg['install_dir'],
+    touch_file = utils.path_normalise(os.path.join(cfg['data_dir'],
                                                    ".opus-live"))
-    opus_home = utils.path_normalise(cfg['install_dir'])
+    opus_home = utils.path_normalise(cfg['data_dir'])
     cc_addr = cfg['cc_addr']
 
+    if not os.path.exists(os.path.dirname(server_cfg_path)):
+        os.makedirs(os.path.dirname(server_cfg_path))
     with open(server_cfg_path, "w") as server_cfg:
         server_cfg.write(
             SERVER_CONFIG_TEMPLATE.format(

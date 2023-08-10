@@ -1,0 +1,14 @@
+diff --git a/python/setup.py b/python/setup.py
+index aab240a0e..66e7afda2 100755
+--- a/setup.py
++++ b/setup.py
+@@ -280,8 +280,7 @@ if __name__ == '__main__':
+         "Programming Language :: Python :: 3.6",
+         "Programming Language :: Python :: 3.7",
+         ],
+-      namespace_packages=['google'],
+-      packages=find_packages(
++      packages=['google'] + find_packages(
+           exclude=[
+               'import_test_package',
+               'protobuf_distutils',

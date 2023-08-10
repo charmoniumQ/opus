@@ -26,10 +26,7 @@ def handle_launch(cfg, binary, arguments):
             print("Aborting command launch.")
             return
 
-    opus_preload_lib = utils.path_normalise(os.path.join(cfg['install_dir'],
-                                                         'lib',
-                                                         'libopusinterpose.so')
-                                            )
+    opus_preload_lib = utils.path_normalise(cfg['libopus_path'])
     if 'LD_PRELOAD' in os.environ:
         if opus_preload_lib not in os.environ['LD_PRELOAD']:
             os.environ['LD_PRELOAD'] = (os.environ['LD_PRELOAD'] + " " +

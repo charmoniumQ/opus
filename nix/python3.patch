@@ -1,0 +1,593 @@
+diff --git a/src/backend/ext_src/opuspb.c b/src/backend/ext_src/opuspb.c
+index 317eb9f..487ff63 100644
+--- a/src/backend/ext_src/opuspb.c
++++ b/src/backend/ext_src/opuspb.c
+@@ -6,7 +6,7 @@ static PyMethodDef PodMethods[] = {
+ 
+ PyMODINIT_FUNC initopuspb(void)
+ {
+-    PyObject *m = NULL;
++    PyObject *m;
+ 
+     m = Py_InitModule("opuspb", PodMethods);
+     if (m == NULL)
+diff --git a/src/backend/opus/analyser_controller.py b/src/backend/opus/analyser_controller.py
+index 17d3c31..64ed155 100644
+--- a/src/backend/opus/analyser_controller.py
++++ b/src/backend/opus/analyser_controller.py
+@@ -10,18 +10,12 @@ from __future__ import (absolute_import, division,
+ 
+ import threading
+ import multiprocessing
+-try:
+-    import Queue
+-except ModuleNotFoundError:
+-    import queue as Queue
++import Queue
+ import logging
+ import types
+ import psutil
+ import time
+-try:
+-    import commands
+-except ModuleNotFoundError:
+-    import subprocess as commands
++import commands
+ 
+ from . import config_util, ipc
+ from .exception import SnapshotException
+diff --git a/src/backend/opus/analysis.py b/src/backend/opus/analysis.py
+index 57ad9f8..e44bc45 100644
+--- a/src/backend/opus/analysis.py
++++ b/src/backend/opus/analysis.py
+@@ -8,10 +8,7 @@ types of analysers have been defined in this file.
+ from __future__ import (absolute_import, division,
+                         print_function, unicode_literals)
+ 
+-try:
+-    import Queue
+-except ModuleNotFoundError:
+-    import queue as Queue
++import Queue
+ import os
+ import logging
+ import threading
+@@ -195,9 +192,9 @@ class OrderingAnalyser(Analyser):
+         self.msg_handler = self.put_msg_file
+         self.do_shutdown()
+ 
+-    def put_msg_file(self, hdr_pay):
+-        self.msg_fh.write(hdr_pay[0])
+-        self.msg_fh.write(hdr_pay[1])
++    def put_msg_file(self, (hdr, pay)):
++        self.msg_fh.write(hdr)
++        self.msg_fh.write(pay)
+         self.msg_fh.flush()
+ 
+     def put_msg(self, msg_list):
+@@ -238,7 +235,7 @@ class OrderingAnalyser(Analyser):
+         '''Run any code that needs to happen whenever the queue is cleared.'''
+         raise NotImplementedError()
+ 
+-    def process(self, hdr_pay):
++    def process(self, (hdr, pay)):
+         '''Process a single message.'''
+         raise NotImplementedError()
+ 
+@@ -279,13 +276,13 @@ class PVMAnalyser(OrderingAnalyser):
+             logging.error("Dumping process state to file")
+         posix.handle_proc_dump_state(self.proc_state_file)
+ 
+-    def process(self, hdr_pay):
++    def process(self, (hdr, pay)):
+         '''Process a single front end message, applying it's effects to the
+         database.'''
+         hdr_obj = messaging.Header()
+-        hdr_obj.loads(hdr_pay[0])
++        hdr_obj.loads(hdr)
+         pay_obj = common_utils.get_payload_type(hdr_obj)
+-        pay_obj.ParseFromString(hdr_pay[1])
++        pay_obj.ParseFromString(pay)
+ 
+         # Set system time for current message
+         self.db_iface.set_sys_time_for_msg(hdr_obj.sys_time)
+@@ -366,6 +363,6 @@ class StatisticsAnalyser(PVMAnalyser):
+         self.inbound.add(len(msg_list))
+         return super(StatisticsAnalyser, self).put_msg(msg_list)
+ 
+-    def process(self, hdr_pay):
++    def process(self, (hdr, pay)):
+         self.outbound.add(1)
+-        return super(StatisticsAnalyser, self).process(hdr_pay)
++        return super(StatisticsAnalyser, self).process((hdr, pay))
+diff --git a/src/backend/opus/cc_utils.py b/src/backend/opus/cc_utils.py
+index d96f6cd..35c47dd 100644
+--- a/src/backend/opus/cc_utils.py
++++ b/src/backend/opus/cc_utils.py
+@@ -9,23 +9,15 @@ from __future__ import (absolute_import, division,
+ import json
+ import socket
+ import struct
+-import sys
+ 
+ from . import multisocket
+ from .exception import BackendConnectionError
+ 
+ CC_HDR = struct.Struct(str("@I"))
+ 
+-if sys.version_info.major >= 3:
+-    def string_to_bytes(string):
+-        return string.encode()
+-else:
+-    def string_to_bytes(string):
+-        return string
+-
+ def send_cc_msg(sock, msg):
+     '''Sends a command control message over the socket sock.'''
+-    msg_txt = string_to_bytes(json.dumps(msg))
++    msg_txt = json.dumps(msg)
+     buf = CC_HDR.pack(len(msg_txt))
+     buf += msg_txt
+     sock.send(buf)
+diff --git a/src/backend/opus/common_utils.py b/src/backend/opus/common_utils.py
+index b99f615..24b6ffc 100644
+--- a/src/backend/opus/common_utils.py
++++ b/src/backend/opus/common_utils.py
+@@ -12,10 +12,6 @@ import copy
+ import logging
+ import time
+ import os
+-try:
+-    from collections import MutableSequence
+-except ImportError:
+-    from collections.abc import MutableSequence
+ 
+ from . import uds_msg_pb2
+ from .exception import InvalidTagException
+@@ -53,7 +49,7 @@ class FixedDict(object):  # pylint: disable=R0903
+         return len(self._dictionary)
+ 
+ 
+-class IndexList(MutableSequence):
++class IndexList(collections.MutableSequence):
+     '''A list that maintains a bisectable index based on a key function.'''
+     def __init__(self, key):
+         self.key = key
+diff --git a/src/backend/opus/ipc.py b/src/backend/opus/ipc.py
+index 8268b93..5bdaa43 100644
+--- a/src/backend/opus/ipc.py
++++ b/src/backend/opus/ipc.py
+@@ -5,10 +5,7 @@ from __future__ import (absolute_import, division,
+ 
+ 
+ import collections
+-try:
+-    import Queue
+-except ModuleNotFoundError:
+-    import queue as Queue
++import Queue
+ import threading
+ import uuid
+ 
+diff --git a/src/backend/opus/opusctl/config.py b/src/backend/opus/opusctl/config.py
+index 67f941c..5789478 100644
+--- a/src/backend/opus/opusctl/config.py
++++ b/src/backend/opus/opusctl/config.py
+@@ -5,8 +5,6 @@ import os
+ import functools
+ import hashlib
+ import sys
+-if sys.version_info.major >= 3:
+-    raw_input = input
+ 
+ from . import utils
+ from .ext_deps import yaml
+@@ -168,19 +166,11 @@ def skip_config(func):
+         return func(*args, **kwargs)
+     return wrap
+ 
+-if sys.version_info.major >= 3:
+-    def string_to_bytes(string):
+-        return string.encode()
+-else:
+-    def string_to_bytes(string):
+-        return string
+-
+-
+ def compute_config_check(cfg):
+     sha1 = hashlib.sha1()
+ 
+     cfg_str = yaml.dump(cfg)
+-    sha1.update(string_to_bytes(cfg_str))
++    sha1.update(cfg_str)
+     return cfg_str, sha1.hexdigest()
+ 
+ 
+@@ -189,8 +179,8 @@ def read_config(config_path):
+         try:
+             with open(config_path, "r") as cfg_file:
+                 check = cfg_file.readline().rstrip()
+-                return (check, yaml.safe_load(cfg_file.read()))
+-        except (yaml.error.YAMLError, IOError):
++                return (check, yaml.load(cfg_file.read()))
++        except [yaml.error.YAMLError, IOError]:
+             raise FailedConfigError()
+     else:
+         raise FailedConfigError()
+diff --git a/src/backend/opus/order.py b/src/backend/opus/order.py
+index c14a52b..568c758 100644
+--- a/src/backend/opus/order.py
++++ b/src/backend/opus/order.py
+@@ -5,10 +5,7 @@ Module containing classes related to enforcing orderings upon messages.
+ from __future__ import (absolute_import, division,
+                         print_function, unicode_literals)
+ 
+-try:
+-    import Queue
+-except ModuleNotFoundError:
+-    import queue as Queue
++import Queue
+ import threading
+ import time
+ 
+diff --git a/src/backend/opus/pvm/core.py b/src/backend/opus/pvm/core.py
+index 3c8c7ff..c472354 100644
+--- a/src/backend/opus/pvm/core.py
++++ b/src/backend/opus/pvm/core.py
+@@ -56,7 +56,7 @@ def version_local(db_iface, old_loc_node, glob_node, glob_loc_rel):
+                                                            old_loc_node)
+ 
+     # Copy over state from previous global->local link if mode is OPUS lite
+-    if (proc_node.get('opus_lite', False)
++    if (proc_node.has_key('opus_lite') and proc.node['opus_lite']
+         and 'state' in glob_loc_rel):
+         new_glob_loc_rel['state'] = glob_loc_rel['state']
+ 
+@@ -80,7 +80,7 @@ def version_global(db_iface, old_glob_node):
+     '''Versions the global object identified by old_glob_node.'''
+     new_glob_node = db_iface.create_node(storage.NodeType.GLOBAL)
+ 
+-    if 'name' in old_glob_node:
++    if old_glob_node.has_key('name'):
+         # Copy over name list from previous old global object
+         name_list = old_glob_node['name']
+         new_glob_node['name'] = list(name_list)
+@@ -93,7 +93,7 @@ def version_global(db_iface, old_glob_node):
+                                    new_glob_node['sys_time'],
+                                    new_glob_node)
+ 
+-    if 'githash' in old_glob_node:
++    if old_glob_node.haskey('githash'):
+         new_glob_node['githash'] = old_glob_node['githash']
+ 
+     db_iface.create_relationship(new_glob_node, old_glob_node,
+@@ -189,7 +189,7 @@ def bind(db_iface, loc_node, glob_node, link_state=None):
+     db_iface.cache_man.invalidate(storage.CACHE_NAMES.LOCAL_GLOBAL,
+                                   loc_node.id)
+     ref_count = 0
+-    if 'name' in glob_node:
++    if glob_node.has_key('name'):
+         ref_count = len(glob_node['name'])
+     loc_node['ref_count'] = ref_count
+ 
+diff --git a/src/backend/opus/pvm/posix/core.py b/src/backend/opus/pvm/posix/core.py
+index 9fb3b3d..4e1d43a 100644
+--- a/src/backend/opus/pvm/posix/core.py
++++ b/src/backend/opus/pvm/posix/core.py
+@@ -12,9 +12,6 @@ import logging
+ from . import functions, process, utils
+ from ... import storage
+ 
+-def get_name(obj):
+-    return getattr(obj, "func_name", getattr(obj, "__name__", "<unknown>"))
+-
+ 
+ def handle_function(db_iface, pid, msg):
+     '''Handle a function call message from the given pid.'''
+@@ -22,7 +19,7 @@ def handle_function(db_iface, pid, msg):
+     try:
+         proc_node = db_iface.get_node_by_id(
+             process.ProcStateController.resolve_process(pid))
+-        affected_node = functions.FuncController.call(get_name(msg),
++        affected_node = functions.FuncController.call(msg.func_name,
+                                                       db_iface,
+                                                       proc_node,
+                                                       msg)
+diff --git a/src/backend/opus/pvm/posix/functions.py b/src/backend/opus/pvm/posix/functions.py
+index 9a2f85d..765c3cf 100644
+--- a/src/backend/opus/pvm/posix/functions.py
++++ b/src/backend/opus/pvm/posix/functions.py
+@@ -28,9 +28,6 @@ from . import actions, process, utils
+ from ... import common_utils, storage, traversal, uds_msg_pb2
+ from ...exception import MissingMappingError
+ 
+-def get_name(obj):
+-    return getattr(obj, "func_name", getattr(obj, "__name__", "<unknown>"))
+-
+ def _parse_mapping(msg, mapping):
+     '''Given a message and an argument mapping, retrieve the value of that
+     argument.'''
+@@ -109,7 +106,7 @@ FuncController.load("pvm.yaml")
+ 
+ def get_fd_from_msg(msg):
+     '''Given a function message retrieves the filedescriptor it operates on.'''
+-    mapping = FuncController.func_map[get_name(msg)]['arg_map']['filedes']
++    mapping = FuncController.func_map[msg.func_name]['arg_map']['filedes']
+     return _parse_mapping(msg, mapping)
+ 
+ 
+diff --git a/src/backend/opus/pvm/posix/process.py b/src/backend/opus/pvm/posix/process.py
+index c70fb57..c57447f 100644
+--- a/src/backend/opus/pvm/posix/process.py
++++ b/src/backend/opus/pvm/posix/process.py
+@@ -8,10 +8,7 @@ from __future__ import (absolute_import, division,
+ 
+ import os
+ import logging
+-try:
+-    import cPickle as pickle
+-except ModuleNotFoundError:
+-    import pickle
++import cPickle as pickle
+ 
+ from ... import common_utils, pvm, storage, traversal, exception
+ from . import actions, utils
+@@ -97,7 +94,8 @@ def clone_file_des(db_iface, old_proc_node, new_proc_node):
+         if latest_glob_node is not None:
+             # If in OPUS lite mode, copy over link state from parent
+             old_state = None
+-            if old_proc_node.get('opus_lite'):
++            if (old_proc_node.has_key('opus_lite') and
++                old_proc['opus_lite']):
+                 if glob_loc_rel is not None:
+                     old_state = glob_loc_rel['state']
+ 
+@@ -124,7 +122,7 @@ class ProcStateController(object):
+             cls.proc_map[pid] = cls.proc_states.FORK
+             new_proc_node = create_proc(db_iface, pid, timestamp)
+ 
+-            if 'opus_lite' in p_node:
++            if p_node.has_key('opus_lite'):
+                 new_proc_node['opus_lite'] = p_node['opus_lite']
+ 
+             cls.__add_proc_node(pid, new_proc_node)
+diff --git a/src/backend/opus/pvm/posix/utils.py b/src/backend/opus/pvm/posix/utils.py
+index 801166a..d0a5724 100644
+--- a/src/backend/opus/pvm/posix/utils.py
++++ b/src/backend/opus/pvm/posix/utils.py
+@@ -14,9 +14,6 @@ import logging
+ from ... import pvm, storage, traversal
+ from ...exception import NoMatchingLocalError, InvalidNodeTypeException
+ 
+-def get_name(obj):
+-    return getattr(obj, "func_name", getattr(obj, "__name__", "<unknown>"))
+-
+ 
+ def parse_git_hash(msg):
+     '''Returns git hash field if present'''
+@@ -62,7 +59,7 @@ def new_meta(db_iface, name, val, time_stamp):
+ def event_from_msg(db_iface, msg):
+     '''Create an event object node from the given function info message.'''
+     event_node = db_iface.create_node(storage.NodeType.EVENT)
+-    event_node['fn'] = get_name(msg)
++    event_node['fn'] = msg.func_name
+     event_node['ret'] = msg.ret_val
+ 
+     arg_keys = []
+@@ -178,7 +175,7 @@ def _bind_global_to_new_local(db_iface, proc_node, o_loc_node, i_loc_node):
+ 
+         # Copy over state from input fd link
+         old_state = None
+-        if proc_node.get('opus_lite'):
++        if proc_node.has_key('opus_lite') and proc_node['opus_lite']:
+             old_state = i_glob_loc_rel['state']
+ 
+         new_glob_node = pvm.version_global(db_iface, i_glob_node)
+@@ -302,7 +299,7 @@ def process_rw_pair(db_iface, proc_node, msg):
+     # In OPUS lite mode, tag read and write on the link
+     read_state = None
+     write_state = None
+-    if proc_node.get('opus_lite'):
++    if proc_node.has_key('opus_lite') and proc_node['opus_lite']:
+         read_state = storage.LinkState.READ
+         write_state = storage.LinkState.WRITE
+ 
+diff --git a/src/backend/opus/query/gen_workflow.py b/src/backend/opus/query/gen_workflow.py
+index d9601eb..14e6447 100755
+--- a/src/backend/opus/query/gen_workflow.py
++++ b/src/backend/opus/query/gen_workflow.py
+@@ -12,14 +12,10 @@ from .. import storage
+ 
+ import os
+ import datetime
+-try:
+-    import cPickle as pickle
+-except ModuleNotFoundError:
+-    import pickle
++import cPickle as pickle
+ import hashlib
+ import logging
+ import re
+-import sys
+ 
+ 
+ action_dict = {0: 'None', 1: 'Copy On Touch', 2: 'Read', 3: 'Write',
+@@ -66,7 +62,7 @@ def update_last_modified_time(sys_time):
+ 
+ 
+ def check_filter(glob_node):
+-    if 'name' not in glob_node:
++    if not glob_node.has_key('name'):
+         return False
+     name = glob_node['name'][0]
+     for f in start_filters:
+@@ -103,7 +99,7 @@ def get_cwd(proc_node):
+ def get_meta(link_type):
+     name_value_map = {}
+     for tmp_rel in link_type.outgoing:
+-        if 'name' not in tmp_rel.end or 'value' not in tmp_rel.end:
++        if not tmp_rel.end.has_key('name') or not tmp_rel.end.has_key('value'):
+             continue
+         name_value_map[tmp_rel.end['name']] = tmp_rel.end['value']
+     return name_value_map
+@@ -126,7 +122,7 @@ def descend_down_proc_tree(db_iface, proc_node, proc_tree_map):
+ 
+ def add_file(glob_node, lineage_list, file_list):
+     lineage_list.append(glob_node)
+-    if 'name' in glob_node and glob_node['name'][0] not in file_list:
++    if glob_node.has_key('name') and glob_node['name'][0] not in file_list:
+         file_list.append(glob_node['name'][0])
+ 
+ 
+@@ -297,16 +293,9 @@ def load_proc_tree_map(file_name):
+     return pickle.load(open(file_name, "rb"))
+ 
+ 
+-if sys.version_info.major >= 3:
+-    def string_to_bytes(string):
+-        return string.encode()
+-else:
+-    def string_to_bytes(string):
+-        return string
+-
+ def get_hash(name):
+     hasher = hashlib.sha1()
+-    hasher.update(string_to_bytes(name))
++    hasher.update(name)
+     return hasher.hexdigest()
+ 
+ 
+diff --git a/src/backend/opus/query_interface.py b/src/backend/opus/query_interface.py
+index 8635c06..8f6f38e 100644
+--- a/src/backend/opus/query_interface.py
++++ b/src/backend/opus/query_interface.py
+@@ -122,7 +122,7 @@ def __add_deleted_node(bin_glob_node, proc_node,
+             start_node = link.start
+             file_name = ""
+ 
+-            if 'name' in start_node:
++            if start_node.has_key('name'):
+                 file_name = start_node['name']
+ 
+             result_list.append((bin_glob_node['name'], proc_node['pid'],
+@@ -135,7 +135,7 @@ def __add_result(result_list, bin_glob_node, proc_node,
+                  file_glob_node, glob_loc_rel):
+     '''Common function that populates result list'''
+     file_name = ""
+-    if 'name' in file_glob_node:
++    if file_glob_node.has_key('name'):
+         file_name = file_glob_node['name']
+ 
+     if len(file_glob_node.GLOB_OBJ_PREV.incoming) > 0:
+diff --git a/src/backend/opus/scripts/workflow_helper.py b/src/backend/opus/scripts/workflow_helper.py
+index ea5f38c..7cb9aa3 100644
+--- a/src/backend/opus/scripts/workflow_helper.py
++++ b/src/backend/opus/scripts/workflow_helper.py
+@@ -9,10 +9,7 @@ from __future__ import (absolute_import, division,
+ 
+ from opus import cc_cfg, cc_utils, common_utils as cu
+ 
+-try:
+-    import cPickle as pickle
+-except ModuleNotFoundError:
+-    import pickle
++import cPickle as pickle
+ import time
+ import datetime
+ 
+diff --git a/src/backend/scripts/env_diff.py b/src/backend/scripts/env_diff.py
+index 81276eb..1e4147a 100755
+--- a/src/backend/scripts/env_diff.py
++++ b/src/backend/scripts/env_diff.py
+@@ -12,9 +12,6 @@ import datetime
+ import os
+ import sys
+ import textwrap
+-import sys
+-if sys.version_info.major >= 3:
+-    raw_input = input
+ 
+ try:
+     import prettytable
+diff --git a/src/backend/scripts/workflow/gen_epsrc.py b/src/backend/scripts/workflow/gen_epsrc.py
+index 608f8ad..11d5c59 100755
+--- a/src/backend/scripts/workflow/gen_epsrc.py
++++ b/src/backend/scripts/workflow/gen_epsrc.py
+@@ -14,9 +14,6 @@ import shutil
+ import sys
+ import tempfile
+ import webbrowser
+-import sys
+-if sys.version_info.major >= 3:
+-    raw_input = input
+ 
+ try:
+     from termcolor import colored
+@@ -106,7 +103,7 @@ def copy_files(pid, proc_rec):
+ 
+ def filter_sys_meta(sys_meta_map):
+     new_sys_meta_map = {}
+-    for name, value in sys_meta_map.items():
++    for name, value in sys_meta_map.iteritems():
+         if name.startswith("RLIMIT_"):
+             continue
+         new_sys_meta_map[name] = value
+@@ -115,7 +112,7 @@ def filter_sys_meta(sys_meta_map):
+ 
+ def filter_env_meta(env_meta_map):
+     new_env_meta_map = {}
+-    for name, value in env_meta_map.items():
++    for name, value in env_meta_map.iteritems():
+         if name.startswith("OPUS_"):
+             continue
+         new_env_meta_map[name] = value
+@@ -265,7 +262,7 @@ def gen_yaml_file(proc_tree_map, queried_file):
+     used_file_map = {}  # file -> [list of keys]
+     produced_file_map = {}  # file -> [list of keys]
+ 
+-    for key, rec in yaml_map.items():
++    for key, rec in yaml_map.iteritems():
+         for uf in rec['used']:
+             if uf not in used_file_map:
+                 used_file_map[uf] = [key]
+@@ -299,7 +296,7 @@ def gen_yaml_file(proc_tree_map, queried_file):
+             for meta_type in meta_type_list:
+                 if meta_type in rec:
+                     output_elm[meta_type] = []
+-                    for tmp_key, tmp_val in rec[meta_type].items():
++                    for tmp_key, tmp_val in rec[meta_type].iteritems():
+                         output_elm[meta_type] += [{"name": tmp_key,
+                                                    "value": tmp_val}]
+ 
+@@ -389,7 +386,7 @@ def package_code_data(rec_list_for_upload, files_data, dest_dir, cur_time):
+                    "files": files_data}
+     for k in file_map.keys():
+         render_data['summary'][k] = []
+-        for dir_name, dir_files in file_map[k].items():
++        for dir_name, dir_files in file_map[k].iteritems():
+             render_data['summary'][k] += [{'dir': dir_name,
+                                            'files': [f for f in dir_files]}]
+ 
+diff --git a/src/backend/setup.py b/src/backend/setup.py
+index 9cafa59..ad5f834 100644
+--- a/src/backend/setup.py
++++ b/src/backend/setup.py
+@@ -13,12 +13,12 @@ setup(name='OPUS',
+       url='',
+       install_requires=["PyYAML", "neo4j-embedded==1.9.c2", "jinja2", "psutil",
+                         "prettytable", "setuptools", "termcolor"],
+-      # ext_modules=[Extension('opus.opuspb',
+-      #                        sources=['ext_src/opuspb.c',
+-      #                                 'proto_cpp_src/uds_msg.pb.cc'],
+-      #                        include_dirs=inc_dirs,
+-      #                        libraries=['protobuf'],)
+-      #                        ],
++      ext_modules=[Extension('opus.opuspb',
++                             sources=['ext_src/opuspb.c',
++                                      'proto_cpp_src/uds_msg.pb.cc'],
++                             include_dirs=inc_dirs,
++                             libraries=['protobuf'],)
++                             ],
+       packages=['opus',
+                 'opus.pvm',
+                 'opus.pvm.posix',

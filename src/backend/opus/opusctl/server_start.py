@@ -89,9 +89,9 @@ def start_opus_server(cfg):
         os.environ['PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION_VERSION'] = '2'
         python_root = (os.path.dirname(os.path.dirname(sys.executable)))
         os.environ["PYTHONPATH"] = ":".join(filter(lambda path: path and not path.startswith(python_root), sys.path))
+        debug_args = [] if cfg["debug_mode"] else ["-O"]
         os.execvp(sys.executable,
-                  [sys.executable,
-                   "-O",
+                  [sys.executable] + debug_args + [
                    "-m",
                    "opus.run_server",
                    server_cfg_path])

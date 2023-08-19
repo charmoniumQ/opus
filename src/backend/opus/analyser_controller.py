@@ -13,6 +13,7 @@ import multiprocessing
 import Queue
 import logging
 import types
+import traceback
 import psutil
 import time
 import commands
@@ -147,7 +148,7 @@ class AnalyserController(object):
                 if(self.fetcher_stop_event.is_set() and
                    self.pf_queue.get_queue_size() == 0):
                     break
-            except SnapshotException:
+            except SnapshotException as exc:
                 logging.error("Snapshot event set!!")
                 self.analyser.snapshot_shutdown()
                 break
@@ -175,12 +176,9 @@ class AnalyserController(object):
         if status != 0:
             logging.error("%d: %s", status, output)
         else:
-            print(output, file=sys.stderr)
-            lines = output.split('\n')
             # on my machine, there is a "Picked up _JAVA_OPTIONS=..." line
             # So the line with numbers is not necessarily the second line.
-            fields = re.search("^(\\s*)([\\d.]+)\\s+([\\d.]+)\\s+([\\d.]+)\\s+([\\d.]+)\\s+([\\d.]+)\\s+([\\d.]+)\\s+([\\d.]+)\\s+([\\d.]+)\\s+([\\d.]+)", line).groups()
-            print(list(fields), file=sys.stderr)
+            fields = re.search("^\\s*([\\d.]+)\\s+([\\d.]+)\\s+([\\d.]+)\\s+([\\d.]+)\\s+([\\d.]+)\\s+([\\d.]+)\\s+([\\d.]+)\\s+([\\d.]+)\\s+([\\d.]+)\\s+([\\d.]+)\\s+([\\d.]+)", output, re.MULTILINE).groups()
             jstat_max_jvm = float(fields[1]) + float(fields[7])
             heap_size = float(fields[3]) + float(fields[4])
             heap_size += float(fields[5]) + float(fields[9])

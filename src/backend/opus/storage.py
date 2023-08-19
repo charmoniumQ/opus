@@ -13,6 +13,7 @@ import threading
 import time
 import os
 import psutil
+import traceback
 
 from . import common_utils
 from .exception import InvalidCacheException, UniqueIDException
@@ -65,6 +66,13 @@ CACHE_NAMES = common_utils.enum(VALID_LOCAL=0,
 
 # Enum values for process status
 PROCESS_STATE = common_utils.enum(ALIVE=0, DEAD=1)
+
+
+def format_stack():
+    stack = traceback.extract_stack()
+    # cut off last elem
+    stack = stack[::-1]
+    return " -> ".join(":".join([module, line]) for module, line, function, _ in stack)
 
 
 class FdChain(object):
@@ -254,7 +262,7 @@ class DBInterface(StorageIFace):
                 row['n']
 
         except Exception as exc:
-            logging.error("Error: %s", str(exc))
+            logging.error("Error: %s %s", str(err), format_stack())
             raise exc
 
     def _config_jvm(self, neo4j_cfg):
@@ -268,7 +276,7 @@ class DBInterface(StorageIFace):
             return
 
         if 'max_jvm_heap_size' in neo4j_cfg:
-            if neo4j_cfg['max_jvm_heap_size'] in 'auto':
+            if neo4j_cfg['max_jvm_heap_size'] == 'auto':
                 logging.info("Calculating maximum JVM heap size "
                              "from available memory")
                 vminfo = psutil.virtual_memory()

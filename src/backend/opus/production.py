@@ -17,10 +17,17 @@ import socket
 import struct
 import threading
 import time
+import traceback
 
 from . import common_utils, ipc, messaging, multisocket, uds_msg_pb2
 from .exception import OPUSException
 
+
+def format_stack():
+    stack = traceback.extract_stack()
+    # cut off last elem
+    stack = stack[::-1]
+    return " -> ".join(":".join([module, line]) for module, line, function, _ in stack)
 
 def get_credentials(client_fd):
     '''Reads the peer credentials from a UDS descriptor'''
@@ -207,7 +214,7 @@ class MultiCommunicationManager(CommunicationManager):
         except socket.error as err:
             if self.server_socket:
                 self.server_socket.close()
-            logging.error("Error: %s", str(err))
+            logging.error("Error: %s %s", str(err), format_stack())
             raise OPUSException("socket error")
         self.server_socket.setblocking(0)  # Make the socket non-blocking
         self.epoll = select.epoll()
@@ -221,7 +228,7 @@ class MultiCommunicationManager(CommunicationManager):
         try:
             event_list = self.epoll.poll(self.select_timeout)
         except IOError as err:
-            logging.error("Error: %s", str(err))
+            logging.error("Error: %s %s", str(err), format_stack())
             return ret_list
 
         if not event_list:

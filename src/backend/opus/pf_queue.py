@@ -55,7 +55,9 @@ class ProducerFetcherQueue(object):
         self.event_exe.excep = excep
 
     def wakeup(self):
+        self.pfq_cond.acquire()
         self.pfq_cond.notify()
+        self.pfq_cond.release()
 
     def get_queue_size(self):
         return self.pf_queue.qsize()

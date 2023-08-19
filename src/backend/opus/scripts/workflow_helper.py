@@ -29,7 +29,6 @@ def parse_command_line(parser):
                         help="Destination directory for files produced by the "
                         "program",
                         type=str, default=".")
-
     args = parser.parse_args()
     return args
 

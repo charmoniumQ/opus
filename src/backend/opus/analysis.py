@@ -138,7 +138,9 @@ class OrderingAnalyser(Analyser):
         stop_event is not set.'''
         while not self.stop_event.is_set():
             try:
+                logging.info("T:Waiting for message")
                 _, msg = self.event_orderer.pop()
+                logging.info("T:Got message!")
                 self.msg_handler(msg)
             except Queue.Empty:
                 if __debug__:
@@ -158,6 +160,7 @@ class OrderingAnalyser(Analyser):
                 if __debug__:
                     logging.debug("T:Clear completed.")
                 continue
+        logging.debug("T:Exiting run-loop")
 
     def do_shutdown(self, drop=False):
         '''Clear the event orderer and then shutdown the processing thread.'''
@@ -229,6 +232,7 @@ class OrderingAnalyser(Analyser):
                 if __debug__:
                     logging.debug("M:Queue cleared, continuing.")
 
+        logging.debug("M:Pushing message with timestamp: %d.", hdr_obj.timestamp)
         self.event_orderer.push(msg_chunk)
 
     def cleanup(self):
@@ -283,6 +287,7 @@ class PVMAnalyser(OrderingAnalyser):
         hdr_obj.loads(hdr)
         pay_obj = common_utils.get_payload_type(hdr_obj)
         pay_obj.ParseFromString(pay)
+        logging.debug("PVM:Received message with timestamp: %d, payload_type: %d, pid: %d.", hdr_obj.timestamp, hdr_obj.payload_type, hdr_obj.pid)
 
         # Set system time for current message
         self.db_iface.set_sys_time_for_msg(hdr_obj.sys_time)

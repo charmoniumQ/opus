@@ -27,28 +27,36 @@ def handle_launch(cfg, binary, arguments):
             return
 
     opus_preload_lib = utils.path_normalise(cfg['libopus_path'])
+    extra_env = {}
     if 'LD_PRELOAD' in os.environ:
         if opus_preload_lib not in os.environ['LD_PRELOAD']:
-            os.environ['LD_PRELOAD'] = (os.environ['LD_PRELOAD'] + " " +
+            extra_env['LD_PRELOAD'] = (os.environ['LD_PRELOAD'] + " " +
                                         opus_preload_lib)
     else:
         os.environ['LD_PRELOAD'] = opus_preload_lib
 
     if cfg['server_addr'][:4] == "unix":
-        os.environ['OPUS_UDS_PATH'] = utils.path_normalise(cfg['server_addr'][7:])
-        os.environ['OPUS_PROV_COMM_MODE'] = cfg['server_addr'][:4]
+        extra_env['OPUS_UDS_PATH'] = utils.path_normalise(cfg['server_addr'][7:])
+        extra_env['OPUS_PROV_COMM_MODE'] = cfg['server_addr'][:4]
     else:
-        os.environ['OPUS_PROV_COMM_MODE'] = cfg['server_addr'][:3]
+        extra_env['OPUS_PROV_COMM_MODE'] = cfg['server_addr'][:3]
         addr = cfg['server_addr'][6:].split(":")
-        os.environ['OPUS_TCP_ADDRESS'] = addr[0]
-        os.environ['OPUS_TCP_PORT'] = addr[1]
-    os.environ['OPUS_MSG_AGGR'] = "1"
-    os.environ['OPUS_MAX_AGGR_MSG_SIZE'] = "65536"
-    os.environ['OPUS_LOG_LEVEL'] = "3"  # Log critical
-    os.environ['OPUS_INTERPOSE_MODE'] = "1"  # OPUS lite
+        extra_env['OPUS_TCP_ADDRESS'] = addr[0]
+        extra_env['OPUS_TCP_PORT'] = addr[1]
+    extra_env['OPUS_MSG_AGGR'] = "1"
+    extra_env['OPUS_MAX_AGGR_MSG_SIZE'] = "65536"
+    extra_env['OPUS_LOG_LEVEL'] = "3"  # Log critical
+    extra_env['OPUS_INTERPOSE_MODE'] = "1"  # OPUS lite
 
     if not binary:
         binary, arguments = get_current_shell()
+    os.environ.update(extra_env)
+    # if cfg["debug_mode"]:
+    #     print(" ".join(
+    #         ["env"]
+    #         + [k + "=" + v for k, v in extra_env.items()]
+    #         + [binary]
+    #         + ["'" + arg + "'" if " " in arg else arg for arg in arguments]))
     os.execvp(binary, [binary] + arguments)
 
 

@@ -19,6 +19,7 @@ class ClientQueryControl(object):
     @classmethod
     def exec_method(cls, db_iface, msg):
         if msg['qry_method'] in cls.client_qry_methods:
+            logging.info("opus.query.ClientQueryControl: method: %s, args: %s", repr(msg['qry_method']), repr(msg['qry_args']))
             return cls.client_qry_methods[msg['qry_method']](db_iface,
                                                              msg['qry_args'])
         else:

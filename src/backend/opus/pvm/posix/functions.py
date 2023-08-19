@@ -87,6 +87,7 @@ class FuncController(object):
         '''Calls the method associated with name with any subsequent
         arguments.'''
         if name in cls.funcs:
+            logging.info("opus.pvm.posix.functions.FuncController.call: %s", name)
             return cls.funcs[name](*args)
         else:
             logging.error("Failed to find mapping for function %s.", name)

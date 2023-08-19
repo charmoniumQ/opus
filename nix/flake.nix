@@ -22,6 +22,7 @@
         };
         python = pkgs.python27;
         version = "0.1.0";
+        # glibc = 
       in rec {
         packages = rec {
           termcolor = python.pkgs.buildPythonPackage rec {
@@ -231,7 +232,7 @@
               pkgs.makeWrapper
             ];
             installPhase = ''
-              mkdir -p "$out"
+             mkdir -p "$out"
               cp -R * "$out"
 
               mkdir -p "$out/bin"
@@ -240,7 +241,7 @@
                   chmod +x "$out/bin/$NEO4J_SCRIPT"
                   wrapProgram "$out/bin/$NEO4J_SCRIPT" \
                       --prefix PATH : "${pkgs.lib.makeBinPath [ jdk pkgs.which pkgs.gawk ]}" \
-                      --set JAVA_HOME "${jdk}"
+                      --set JAVA_HOME ${jdk}/lib/openjdk/
               done
 
               # Putting jars in $out/share/java ensures they get placed on the CLASSPATH
@@ -298,13 +299,13 @@
               runHook postCheck
             '';
           };
-          opus-lib = pkgs.stdenv.mkDerivation {
-            pname = "opus-lib";
+          opus-backend = pkgs.stdenv.mkDerivation {
+            pname = "opus-backend";
             version = "0.1.0";
             src = builtins.path {
               path = ./..;
               name = "source";
-              filter = path: type: let bname = builtins.baseNameOf path; in bname != ".git" && bname != "flake.nix";
+              filter = path: type: let bname = builtins.baseNameOf path; in bname != ".git" && bname != "nix" && bname != "backend";
             };
             buildInputs = [
               pkgs.openssl
@@ -326,34 +327,38 @@
               export OPUS_LIB_NAME=opusinterpose
 
               cp -r $src .
+
+              # We omitted src/backend because that isn't an input of this build.
+              # But some Makefiles want to output to that path.
+              # So let's ensure it exists
+              mkdir -p src/backend/opus
+
               make -C src/protobuf
               make -C src/messaging
               make -C src/frontend
 
               mkdir $out
               cp src/frontend/interposelib/libopusinterpose.so $out
+
               # This is stuff opus-py needs
-              cp -r src/backend/proto_cpp_src $out
               cp src/backend/opus/{uds_msg_pb2,messaging}.py $out
-              cp -r include $out
             '';
             installPhase = "true";
             pythonImportsCheck = [ "opus" ];
           };
-          opus-py = python.pkgs.buildPythonPackage {
+          opus-frontend = python.pkgs.buildPythonPackage {
             pname = "opus";
             version = version;
             src = builtins.path {
               path = ./..;
               name = "source";
-              filter = path: type: let bname = builtins.baseNameOf path; in bname != ".git" && bname != "flake.nix";
+              filter = path: type: let bname = builtins.baseNameOf path; in bname != ".git" && bname != "nix" && bname != "frontend" && bname != "protobuf" && bname != "messaging";
             };
             buildInputs = [
               protobuf
               pkgs.makeWrapper
             ];
             propagatedBuildInputs = [
-              # TODOO: Do I need to list the packages of this Python?
               python.pkgs.jinja2
               neo4j-embedded
               pyyaml
@@ -366,22 +371,18 @@
               python.pkgs.six
               protobuf
             ];
-            patches = [ ./nix.diff ];
             configurePhase = ''
-              # TODO: consider removing src/backend/{proto_cpp_src,ext_src} from this copy, the above package, the source tree, and setup.py
-              cp -r ${opus-lib}/proto_cpp_src ./src/backend/
-              cp    ${opus-lib}/{messaging,uds_msg_pb2}.py ./src/backend/opus/
-              export PROJ_INCLUDE="${opus-lib}/include";
+              cp    ${opus-backend}/{messaging,uds_msg_pb2}.py ./src/backend/opus/
+              export PROJ_INCLUDE="${opus-backend}/include";
               export OPUS_INSTALL_DIR=$PWD
-              # TODO: avoid doing this CD
               mkdir -p $out/lib
-              cp ${opus-lib}/libopusinterpose.so $out/lib/libopusinterpose.so
+              cp ${opus-backend}/libopusinterpose.so $out/lib/libopusinterpose.so
               cd src/backend
             '';
             postInstall = ''
               wrapProgram \
                 $out/bin/opusctl.py \
-                  --set LIBOPUS_PATH $out/lib/libopusinterpose.so \
+                  --set LIBOPUS_PATH ${opus-backend}/libopusinterpose.so \
                   --set LD_LIBRARY_PATH ${protobuf}/lib:$LD_LIBRARY_PATH \
                   --set JAVA_HOME ${jdk}/lib/openjdk/ \
                   --set PATH ${jdk}/lib/openjdk/bin
@@ -391,9 +392,16 @@
             doCheck = false;
             # TODO: change this to doCheck
           };
-          opus-env = pkgs.symlinkJoin {
-            name = "opus-env";
-            paths = [ pkgs.pkgsStatic.busybox opus-py ];
+          opus-env = pkgs.stdenv.mkDerivation {
+            pname = "opus-env";
+            version = "0.1.0";
+            dontUnpack = true;
+            buildPhase = "true";
+            installPhase = ''
+              mkdir -p $out/bin
+              cp ${opus-frontend}/bin/*.py ${pkgs.busybox}/bin/{busybox,env,sh,cat,ls} ${neo4j}/bin/neo4j-shell $out/bin
+
+            '';
           };
           default = opus-env;
         };
@@ -407,10 +415,28 @@
       }
     );
 }
-  /*
+/*
 TODO:
 - Use overrides to simplify the code
 - Use 3.17 from Nixpkgs
 - Python packages should work for any Python version?
-- Exclude nix/ from ./src (but ensure safety)
-  */
+
+./result/bin/opusctl.py server stop
+nix --print-build-logs --show-trace build .#opus-env
+procs=$(lsof -t -i :10101 -s TCP:LISTEN)
+if [ -n "$procs" ]; then kill ${=procs}; fi
+./result/bin/opusctl.py server status
+rm -rf ~/.local/share/opus/{opus{,_err}.log,prov.neo4j} data/ prov/
+./result/bin/opusctl.py server start
+./result/bin/opusctl.py server status
+cat ~/.local/share/opus/opus{,_err}.log
+mkdir data prov
+./result/bin/opusctl.py process launch ./result/bin/sh -c './result/bin/ls > data/file0'
+./result/bin/opusctl.py server stop
+
+./result/bin/opusctl.py process launch ./result/bin/sh -c './result/bin/ls > data/file0; ./result/bin/ls -l > data/file1; ./result/bin/cat data/file0 data/file1 > data/file2'
+./result/bin/gen_script.py --dest prov data/file0
+./result/bin/gen_script.py --dest prov data/file1
+./result/bin/gen_script.py --dest prov data/file2
+cat prov/*.sh
+*/

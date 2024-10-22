@@ -54,8 +54,8 @@ All of which dropped support for Python 2.7 a long time ago.
 As such, my Nix flake specifies and builds-from-source old versions of these packages.
 But these came with their own problems:
 
-- neo4j-embedded does not exist anymore in PyPI, but I found the repository on GitHub and built it form source. It depends on Neo4j 1.9 because of [this line][neo4j-1.9]. Additionally, neo4j-embedded requires a maven step and some source-code modifications which I painstakingly applied in `neo4j-pom.patch` and `neo4j-src.patch`.
-- Newer versions of Jpype1 did not work with this code, so I had to use exactly version 0.5.4.3, which was developed for JDK7. JDK7 does not exist in Nixpkgs, and building from source is arduous, but JDK8 does exist in Nixpkgs and seems to work sufficiently well.
+- neo4j-embedded does not exist anymore in PyPI, but I found the repository on GitHub and built it form source. It depends on Neo4j 1.9 (end-of-life 2014) because of [this line][neo4j-1.9]. Additionally, neo4j-embedded requires a maven step and some source-code modifications which I painstakingly applied in `neo4j-pom.patch` and `neo4j-src.patch`.
+- Newer versions of Jpype1 did not work with this code, so I had to use exactly version 0.5.4.3, which was tested against JDK 1.6 (end-of-life 2015). JDK1.6 does not exist in Nixpkgs, and building from source is arduous, but JDK8 does exist in Nixpkgs and seems to work sufficiently well.
 - The version of Protobuf must be synchronized with the version used to build the backend. Protobuf 3.17.3 is the latest which nominally supports Python 2.7. However, this version uses namespace packages which must be reduced to normal packages before it will work with Python 2.7 (see `protobuf-python-bindings.patch`).
 
 In the interest of reproducibility, the Nix flake use a specific version of GLibC rather than your system's version to compile against.
